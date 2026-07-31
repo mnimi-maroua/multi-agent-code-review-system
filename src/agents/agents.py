@@ -34,7 +34,7 @@ MODEL_FOR_ROLE = {
 MAX_TOKENS_FOR_ROLE = {
     "style": 2000,
     "logic": 4000,
-    "test": 1200,
+    "test": 1800,
     "critic": 2500,
 }
 
