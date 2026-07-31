@@ -4,3 +4,5 @@ __pycache__/
 *.pyc
 .ipynb_checkpoints/
 pr_dataset.json
+data/baseline_results_multi.json
+comparison_*.txt
