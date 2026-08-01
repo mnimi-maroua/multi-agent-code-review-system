@@ -6,6 +6,10 @@ A code review system that compares a single generalist LLM reviewer against a te
 
 ---
 
+## Try it live
+
+streamlit run streamlit_app.py
+
 ## The problem
 
 A single LLM given a full diff and asked to "review this code" tends to produce a review that touches lightly on everything — naming, tests, logic — without going deep on any one of them. On a real bug-fix PR ([#1821](https://github.com/fastapi/typer/pull/1821)), the single-agent baseline explicitly wrote *"I'm not entirely sure why this change was made"* about the exact line that fixed the bug, while the human reviewer identified the root cause in one sentence.
