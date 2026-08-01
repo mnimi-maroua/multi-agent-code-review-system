@@ -6,3 +6,6 @@ __pycache__/
 pr_dataset.json
 data/baseline_results_multi.json
 comparison_*.txt
+data/graph_results_config_c.json
+data/evaluation_results_config_c.json
+logs/

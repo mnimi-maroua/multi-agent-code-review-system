@@ -1,9 +1,9 @@
 """
 Specialized agent callers.
 
-Config B: all four agents use the SAME model (GPT-OSS 120B via Groq), so
-any quality difference vs. the single-agent baseline can be attributed to
-prompt specialization alone, not to a different/better model.
+The active model configuration (which model runs each role, and its
+token budget) is selected via the AGENT_CONFIG environment variable,
+see agents/model_configs.py for the available named configs (B, C).
 
 All calls go through a shared RateLimiter to respect Groq's tokens-per-minute
 cap, instead of relying on fixed sleep() guesses.
@@ -11,6 +11,7 @@ cap, instead of relying on fixed sleep() guesses.
 
 import logging
 import os
+import re
 from groq import Groq
 
 from agents.prompts import (
@@ -20,35 +21,55 @@ from agents.prompts import (
     CRITIC_AGENT_PROMPT,
 )
 from agents.rate_limiter import RateLimiter, estimate_tokens
+from agents.model_configs import CONFIGS
+from agents.guardrails import apply_confidence_flag
 
 logger = logging.getLogger("agents")
 
-# Config B: one model for every role. Change per-role here for Config C.
-MODEL_FOR_ROLE = {
-    "style": "openai/gpt-oss-120b",
-    "logic": "openai/gpt-oss-120b",
-    "test": "openai/gpt-oss-120b",
-    "critic": "openai/gpt-oss-120b",
-}
+ACTIVE_CONFIG_NAME = os.getenv("AGENT_CONFIG", "B").strip().upper()
+if ACTIVE_CONFIG_NAME not in CONFIGS:
+    raise ValueError(f"Unknown AGENT_CONFIG '{ACTIVE_CONFIG_NAME}'. Valid options: {list(CONFIGS)}")
 
-MAX_TOKENS_FOR_ROLE = {
-    "style": 2000,
-    "logic": 4000,
-    "test": 1800,
-    "critic": 2500,
-}
+_active = CONFIGS[ACTIVE_CONFIG_NAME]
+MODEL_FOR_ROLE = _active["MODEL_FOR_ROLE"]
+MAX_TOKENS_FOR_ROLE = _active["MAX_TOKENS_FOR_ROLE"]
+logger.info("Active agent config: %s -- %s", ACTIVE_CONFIG_NAME, MODEL_FOR_ROLE)
 
 MIN_VALID_LENGTH = 20  # a real answer is never just a few characters
 
-# Groq free tier: 8000 tokens/minute for openai/gpt-oss-120b at time of writing.
-# Verify current limits at https://console.groq.com/docs/rate-limits before changing.
+# Groq free tier: 8000 tokens/minute for the models used here at time of
+# writing. Verify current limits at https://console.groq.com/docs/rate-limits.
 TOKENS_PER_MINUTE = 8000
 _rate_limiter = RateLimiter(tokens_per_minute=TOKENS_PER_MINUTE)
 
+THINK_BLOCK_RE = re.compile(r"<think>(.*?)</think>", re.DOTALL)
+THINK_OPEN_RE = re.compile(r"<think>", re.IGNORECASE)
+
+
+def strip_reasoning(raw_text: str, role: str) -> str:
+    """
+    Remove a <think>...</think> reasoning trace (emitted by reasoning
+    models like Qwen) and return only the final answer, so downstream
+    agents (especially the Critic) never receive raw chain-of-thought.
+    """
+    if not raw_text:
+        return raw_text
+
+    match = THINK_BLOCK_RE.search(raw_text)
+    if match:
+        return raw_text[match.end():].strip()
+
+    if THINK_OPEN_RE.search(raw_text):
+        # <think> was opened but never closed -- the model ran out of
+        # tokens mid-reasoning. Nothing usable follows it.
+        logger.warning("[%s] reasoning truncated (no closing </think>); "
+                        "consider raising max_tokens further", role)
+        return ""
+
+    return raw_text.strip()
+
 
 def _call_groq(model: str, prompt: str, max_tokens: int, role: str) -> str:
-    # Reserve budget for both the prompt tokens (input) and the requested
-    # completion tokens (output) -- both count against the TPM cap.
     estimated_prompt_tokens = estimate_tokens(prompt)
     _rate_limiter.reserve(estimated_prompt_tokens + max_tokens)
 
@@ -59,9 +80,12 @@ def _call_groq(model: str, prompt: str, max_tokens: int, role: str) -> str:
         messages=[{"role": "user", "content": prompt}],
     )
     choice = response.choices[0]
-    text = choice.message.content or ""
+    raw_text = choice.message.content or ""
 
-    logger.info("[%s] finish_reason=%s, length=%d chars", role, choice.finish_reason, len(text))
+    logger.info("[%s] finish_reason=%s, raw_length=%d chars", role, choice.finish_reason, len(raw_text))
+
+    text = strip_reasoning(raw_text, role)
+
     if len(text.strip()) < MIN_VALID_LENGTH:
         logger.warning("[%s] suspiciously short/empty response (finish_reason=%s): %r",
                         role, choice.finish_reason, text)
@@ -101,4 +125,22 @@ def run_critic_agent(style_review: str, logic_review: str, test_review: str) -> 
         logic_review=logic_review,
         test_review=test_review,
     )
-    return _call_groq(MODEL_FOR_ROLE["critic"], prompt, MAX_TOKENS_FOR_ROLE["critic"], "critic")
+
+    # Style + Logic + Test just consumed a large chunk of the per-minute
+    # token budget in quick succession. Give the rate limit window a
+    # moment to recover before the Critic call.
+    import time
+    time.sleep(5)
+
+    max_retries = 3
+    for attempt in range(1, max_retries + 1):
+        try:
+            result = _call_groq(MODEL_FOR_ROLE["critic"], prompt, MAX_TOKENS_FOR_ROLE["critic"], "critic")
+            return apply_confidence_flag(result)
+        except Exception as exc:  # noqa: BLE001
+            wait = 15 * attempt
+            logger.warning("[critic] attempt %d/%d failed (%s); waiting %ds for rate limit to recover",
+                            attempt, max_retries, exc, wait)
+            time.sleep(wait)
+
+    return "[ERROR] Critic agent failed after retries due to rate limiting. Re-run this PR later."

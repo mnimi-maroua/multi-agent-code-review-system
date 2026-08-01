@@ -14,8 +14,6 @@ problem the rate limiter was built to avoid. Sequential execution here
 still demonstrates the graph/state/node/edge pattern -- switching to
 parallel later is a one-line change (see comment near add_edge calls)
 once running on a paid tier with real concurrency headroom.
-
-
 """
 
 from __future__ import annotations
@@ -31,14 +29,10 @@ from dotenv import load_dotenv
 from langgraph.graph import StateGraph, END
 
 from agents.agents import run_style_agent, run_logic_agent, run_test_agent, run_critic_agent
+from logging_config import setup_logging
 
 load_dotenv()
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s | %(levelname)-7s | %(message)s",
-    datefmt="%H:%M:%S",
-)
 logger = logging.getLogger("graph")
 
 MAX_DIFF_CHARS = 8000
@@ -189,7 +183,12 @@ def run_single_pr(dataset_path: Path, output_path: Path, pr_number: int) -> None
 
     diff_text = pr["diff"][:MAX_DIFF_CHARS]
     logger.info("Running graph on PR #%s - %s", pr["number"], pr["title"])
-    agent_outputs = review_with_graph(diff_text)
+
+    try:
+        agent_outputs = review_with_graph(diff_text)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("PR #%s failed: %s", pr["number"], exc)
+        agent_outputs = {"error": str(exc)}
 
     existing = load_dataset(output_path) if output_path.exists() else []
     existing = [r for r in existing if r["number"] != pr_number]
@@ -216,6 +215,7 @@ def parse_args() -> argparse.Namespace:
 
 
 if __name__ == "__main__":
+    setup_logging("graph")
     args = parse_args()
     if args.pr is not None:
         run_single_pr(args.dataset, args.output, args.pr)

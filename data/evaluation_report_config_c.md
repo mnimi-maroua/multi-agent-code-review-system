@@ -1,0 +1,24 @@
+# Evaluation Report
+
+**Average score:** 4.27/5 across 15/15 evaluated PRs
+
+- Category A (vs. human comments): 4.50/5 over 4 PRs
+- Category B (vs. PR description): 4.18/5 over 11 PRs
+
+| PR | Category | Score | Reason |
+|---|---|---|---|
+| #1904 🐛 Prevent scroll-to-top on restart/fast buttons in | B | 2 | The AI review correctly identifies the change made in the PR (preventing scroll-to-top on restart/fast buttons), but fails to directly reference the documentation in the PR title, hinting that it may be missing the specific context the change is made in. |
+| #1863 💥 Update metavar printing | A | 3 | The AI review identifies the potential for documentation mismatch but doesn't capture the human's specific concerns about stylistic consistency, such as quoting, type notation, command ordering, and table formatting. |
+| #1843 🐛 Fix formatting in `NoSuchOption.format_message() | B | 4 | The AI review accurately identifies the change made in the pull request and explains its purpose, but fails to provide information on the PR's title and description are lacking, implying some assumptions were made. |
+| #1821 🐛 Ensure that the default of a list argument is us | A | 5 | The AI review not only identifies the same core issues (correctness and naming conventions) but also provides identical suggestions for improvement and even includes specific code fixes. |
+| #1820 🐛 Respect wait=False when launching URLs with xdg- | B | 5 | The AI review accurately identifies and engages with the PR's actual purpose by analyzing the implementation, identifying potential side-effects, and suggesting improvements, and also provides recommendations for improving test coverage and style. |
+| #1812 🐛 Ensure that hidden commands are not shown when R | B | 5 | The AI review accurately describes and assesses the PR's code changes, testing, and potential edge cases, and provides specific feedback on its correctness and regression risk, effectively engaging with the PR's actual purpose. |
+| #1810 🔥 Remove old stub packages | B | 5 | The AI review thoroughly identifies the potential regression and its implications, effectively engaging with the actual purpose of the PR, despite a lack of description. |
+| #1792 ♻️ Unify the testing functionality | B | 5 | The AI review thoroughly identifies and addresses the actual problem of the PR – deleting the file containing testing functionality and its impact on code that relies on it – based solely on the title and lack of description. |
+| #1791 🐛 Ensure that an envvar set for a `typer.Option` l | B | 5 | The AI-generated review accurately identifies and discusses the changes made in the PR, including the incorrect implementation of the guard condition and the potential impacts on existing code, as well as recommending improvements to test coverage and code style. |
+| #1788 🐛 Ensure that an envvar set for `typer.Option` wor | A | 5 | The AI review accurately captures the main issue with the new return statement changing the semantics of the `Option.value_from_envvar` method, including the specific problem of missing empty-string handling as "unset". |
+| #1780 🔥 Remove config files now in central GitHub repo | B | 5 | The AI review clearly identifies the problem/change described in the title as the removal of config files and its various implications, and provides a detailed and nuanced analysis of its effects. |
+| #1774 ➖ Vendor Click and streamline Typer's functionalit | A | 5 | The AI review accurately captures the core point raised by the human reviewer about depending on `annotated-doc` feeling small to mention, not addressing the new versioning concern directly but capturing its essence, and suggesting updates to other documentation that might contain contradictory information. |
+| #1770 Enable `ty` and resolve typing issues | B | 4 | The AI review thoroughly analyzes the code changes and identifies the functional fixes, but its assessment could be more direct and clear about the main purpose (enabling `ty` and resolving typing issues) and instead delves into more specific issues like style and test-coverage gaps. |
+| #1767 ✅ Extend completion unit tests for zsh, powershell | B | 5 | The AI review thoroughly assesses the PR, correctly identifies the problem it attempts to solve (extending completion unit tests for zsh, powershell, and pwsh), and provides comprehensive feedback on potential issues such as regression risks, test coverage gaps, and style. |
+| #1773 Bring feature branch up-to-date with `master` | B | 1 | The AI review discusses various issues and improvements but does not mention or imply anywhere that the actual problem this PR is trying to solve is to bring the feature branch up-to-date with `master`. |
